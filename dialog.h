@@ -20,6 +20,7 @@ private slots:
     void showStatus(const QString &);
     void showInfo(const QString &);
     void showError(const QString &, const QString &);
+    void exit();
 
 public:
     explicit Dialog(QWidget *parent = nullptr);

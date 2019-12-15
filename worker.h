@@ -33,6 +33,7 @@ signals:
     void sigShowError(const QString &, const QString &);  // show error message
     void sigCheckUpdate();
     void sigLaunchGame();
+    void sigExit();
 
 private slots:
     void updateProgress(qint64, qint64);  // update the progress bar
@@ -57,8 +58,10 @@ private:
     bool showProgress;
     int download(QUrl*, bool, QString, QString);
     void extractZip();
-//    void executeGame(QString, QString, QString);
     void parseXML(QString, VersionInfo *);
+    bool unzip(QString);
+    bool deleteFileOrDirectory(QString);
+    bool checkNetworkOnline();
 
 };
 

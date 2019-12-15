@@ -13,13 +13,14 @@ Dialog::Dialog(QWidget *parent) : QDialog(parent), ui(new Ui::Dialog) {
     connect(worker, SIGNAL(sigShowStatus(const QString &)), this, SLOT(showStatus(const QString &)));
     connect(worker, SIGNAL(sigShowInfo(const QString &)), this, SLOT(showInfo(const QString &)));
     connect(worker, SIGNAL(sigShowError(const QString &, const QString &)), this, SLOT(showError(const QString &, const QString &)));
+    connect(worker, SIGNAL(sigExit()), this, SLOT(exit()));
     workerThread.start();
     emit sigWork();
 }
 
 void Dialog::showProgress(qint64 dowloadedBytes, qint64 totalBytes){
-    qDebug() << "dowloadedBytes: " << dowloadedBytes;
-    qDebug() << "totalBytes: " << totalBytes;
+//    qDebug() << "dowloadedBytes: " << dowloadedBytes;
+//    qDebug() << "totalBytes: " << totalBytes;
     if (totalBytes == -1){
         ui->progressBar->setValue(0);
         return;
@@ -36,11 +37,18 @@ void Dialog::showInfo(const QString & info){
 }
 
 void Dialog::showError(const QString & title, const QString & message){
-    QMessageBox::critical(this, title, message);
+    QMessageBox::StandardButton button = QMessageBox::critical(this, title, message);
+    if(button == QMessageBox::Ok || QMessageBox::Close){
+        exit();
+    }
 }
 
-Dialog::~Dialog()
-{
+void Dialog::exit(){
+    qApp->quit();
+}
+
+Dialog::~Dialog(){
     workerThread.exit();
+    delete worker;
     delete ui;
 }

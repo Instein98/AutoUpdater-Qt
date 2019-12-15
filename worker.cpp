@@ -1,6 +1,9 @@
 #include "worker.h"
-
 #include <QFileInfo>
+#include <QDir>
+#include <QProcess>
+#include <QEventLoop>
+#include <private/qzipreader_p.h>
 
 struct Worker::VersionInfo{
     QString versionTag;
@@ -78,7 +81,7 @@ void Worker::onFinishDownload(){
             break;
         }
         default:  // Other cases
-            qDebug() << "Network Error, statusCode: " << statusCode;
+//            qDebug() << "Network Error, statusCode: " << statusCode;
             emit sigShowError("Network Error", "HTTP status codes: " + QString::number(statusCode));
             downloadedFile->close();
             delete downloadedFile;
@@ -100,6 +103,10 @@ int Worker::download(QUrl *url, bool wantShowProgress, QString fileName, QString
         return FAILURE;
     }
     networkManager = new QNetworkAccessManager;
+//    if (!checkNetworkOnline()){
+//        emit sigShowError("Network Error", "Please check your internet connection!");
+//        return FAILURE;
+//    }
     networkReply = networkManager->get(QNetworkRequest(*url));
     connect(networkReply, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
     connect(networkReply, SIGNAL(finished()), this, SLOT(onFinishDownload()));
@@ -119,18 +126,43 @@ void Worker::checkUpdate(){
     if (oldXmlInfo.isFile()){
         parseXML(OLD_XML_NAME, oldVersionInfo);
         if (QString::compare(oldVersionInfo->versionTag, newVersionInfo->versionTag)==0){  // already latest
-            emit sigShowStatus("Game is already up to date; Launching game...");
-            emit sigLaunchGame();
+            // check game file
+            QDir dir(newVersionInfo->dirName);
+            QFileInfo zipInfo(newVersionInfo->zipName);
+            if (dir.exists() || zipInfo.exists()){
+                connect(this, SIGNAL(sigLaunchGame()), this, SLOT(launchGame()));
+                emit sigShowProgress(1, 1);
+                emit sigShowStatus("Game is already up to date; Launching game...");
+                emit sigLaunchGame();
+            }else{
+                // Download new game files
+                emit sigShowInfo(newVersionInfo->updateInfo);
+                QUrl url = QUrl::fromUserInput(newVersionInfo->url);
+                download(&url, true, url.fileName(), "Updating...");
+            }
         }else{
+            // Delete old game files first
+            QDir dir(oldVersionInfo->dirName);
+            if (dir.exists()){
+                deleteFileOrDirectory(dir.absolutePath());
+            }
+            QFileInfo zipInfo(oldVersionInfo->zipName);
+            if (zipInfo.exists()){
+                deleteFileOrDirectory(zipInfo.absolutePath());
+            }
+            // Download new game files
+            emit sigShowInfo(newVersionInfo->updateInfo);
             QUrl url = QUrl::fromUserInput(newVersionInfo->url);
             download(&url, true, url.fileName(), "Updating...");
         }
     }else{
+        emit sigShowInfo(newVersionInfo->updateInfo);
         QUrl url = QUrl::fromUserInput(newVersionInfo->url);
         download(&url, true, url.fileName(), "Updating...");
     }
 }
 
+// parse the xml file to the structure VersionInfo
 void Worker::parseXML(QString fileName, VersionInfo *versionInfo){
     QFile file(fileName);
     if(!file.open(QIODevice::ReadOnly | QIODevice::Text)){  // will download the new version
@@ -173,7 +205,87 @@ void Worker::parseXML(QString fileName, VersionInfo *versionInfo){
     file.close();
 }
 
+// unzip the game zip file and execute the game
 void Worker::launchGame(){
+    QDir dir(newVersionInfo->dirName);
+    if (!dir.exists()){
+        QFileInfo zipInfo(newVersionInfo->zipName);
+        if (!zipInfo.exists()){
+            emit sigShowError("File Missing", "Can not find game files.");
+            return;
+        }
+        if (!unzip(newVersionInfo->zipName)){
+            return;
+        }
+    }
 
+    // check whether the exe exist
+    QFileInfo exeInfo(newVersionInfo->dirName+"\\"+newVersionInfo->exeName);
+    if (!exeInfo.exists()){
+        emit sigShowError("File Missing", "Can not find executable file.");
+        return;
+    }
+
+    // should not delete this process, it still runs after GUI terminate
+    QProcess *process = new QProcess();
+    process->start(newVersionInfo->dirName+"\\"+newVersionInfo->exeName, QStringList());
+    process->waitForFinished(1500);  // wait for 1.5s and quit GUI
+    emit sigExit();
 }
 
+// unzip zip file compressed by deflate algorithm
+bool Worker::unzip(QString fileName){
+    QZipReader qZip(fileName);
+    foreach(QZipReader::FileInfo item, qZip.fileInfoList()){
+        if (item.isDir){
+            QDir d(item.filePath);
+            if (!d.exists())
+                d.mkpath(item.filePath);
+        }else if (item.isFile){
+            QFile file(item.filePath);
+            file.open(QIODevice::WriteOnly | QIODevice::Truncate);
+            file.write(qZip.fileData(item.filePath));
+            file.close();
+        }
+    }
+    qZip.close();
+    // if unzip failed, remove the damaged zip file
+    QDir dir(newVersionInfo->dirName);
+    if (!dir.exists()){
+        deleteFileOrDirectory(newVersionInfo->zipName);
+        emit sigShowError("Unzip Error", "The zip file may be damaged.");
+        return false;
+    }
+    return true;
+}
+
+bool Worker::deleteFileOrDirectory(QString path){
+    if (path.isEmpty() || !QDir().exists(path)){
+        return false;
+    }
+    QFileInfo fileInfo(path);
+    if (fileInfo.isFile()){
+        return QFile::remove(path);
+    }else if(fileInfo.isDir()){
+        QDir dir(path);
+        dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
+        QFileInfoList fileList = dir.entryInfoList();
+        foreach (QFileInfo fi, fileList){
+            if (fi.isFile()){
+                fi.dir().remove(fi.fileName());
+            }else{
+                deleteFileOrDirectory(fi.absoluteFilePath());
+            }
+        }
+        dir.rmpath(dir.absolutePath());
+    }
+    return true;
+}
+
+bool Worker::checkNetworkOnline(){
+    QNetworkAccessManager am;
+    if (am.networkAccessible() != QNetworkAccessManager::NotAccessible)
+        return true;
+    else
+        return false;
+}
