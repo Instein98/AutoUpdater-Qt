@@ -1,8 +1,8 @@
-#include "worker.h"
+﻿#include "worker.h"
 #include <QFileInfo>
 #include <QDir>
 #include <QProcess>
-#include <QEventLoop>
+#include <QTextCodec>
 #include <private/qzipreader_p.h>
 
 struct Worker::VersionInfo{
@@ -164,43 +164,45 @@ void Worker::checkUpdate(){
 
 // parse the xml file to the structure VersionInfo
 void Worker::parseXML(QString fileName, VersionInfo *versionInfo){
+    // Avoid chinese messy code
+    QTextCodec *codec = QTextCodec::codecForName("UTF8");
     QFile file(fileName);
     if(!file.open(QIODevice::ReadOnly | QIODevice::Text)){  // will download the new version
         emit sigShowError("File I/O Erorr", "Can not open xml file!");
         return;
     }
-    QString line;
-    QTextStream textStream(&file);
-    int left;
-    int right;
-    while(!textStream.atEnd()){
-        line = textStream.readLine();
-        for (int i = 0; i < 6; i++){
-            if ((left = line.indexOf(xmlStartTag[i]))!=-1){
-                right = line.indexOf(xmlEndTag[i]);
-                int len = xmlStartTag[i].length();
-                switch(i){
-                case 0:
-                    versionInfo->versionTag = line.mid(left+len, right-left-len);
-                    break;
-                case 1:
-                    versionInfo->url = line.mid(left+len, right-left-len);
-                    break;
-                case 2:
-                    versionInfo->zipName = line.mid(left+len, right-left-len);
-                    break;
-                case 3:
-                    versionInfo->dirName = line.mid(left+len, right-left-len);
-                    break;
-                case 4:
-                    versionInfo->exeName = line.mid(left+len, right-left-len);
-                    break;
-                case 5:
-                    versionInfo->updateInfo = line.mid(left+len, right-left-len);
-                    break;
-                }
-            }
-        }
+
+    while(!file.atEnd()){
+         QByteArray byteArray = file.readLine();
+         QString line = codec->toUnicode(byteArray);
+         int left;
+         int right;
+         for (int i = 0; i < 6; i++){
+             if ((left = line.indexOf(xmlStartTag[i]))!=-1){
+                 right = line.indexOf(xmlEndTag[i]);
+                 int len = xmlStartTag[i].length();
+                 switch(i){
+                 case 0:
+                     versionInfo->versionTag = line.mid(left+len, right-left-len);
+                     break;
+                 case 1:
+                     versionInfo->url = line.mid(left+len, right-left-len);
+                     break;
+                 case 2:
+                     versionInfo->zipName = line.mid(left+len, right-left-len);
+                     break;
+                 case 3:
+                     versionInfo->dirName = line.mid(left+len, right-left-len);
+                     break;
+                 case 4:
+                     versionInfo->exeName = line.mid(left+len, right-left-len);
+                     break;
+                 case 5:
+                     versionInfo->updateInfo = line.mid(left+len, right-left-len).replace("\\n", "\n");  // to support new line
+                     break;
+                 }
+             }
+         }
     }
     file.close();
 }
