@@ -1,7 +1,6 @@
-#ifndef WORKER_H
+﻿#ifndef WORKER_H
 #define WORKER_H
 
-#include <QThread>
 #include <QString>
 #include <QUrl>
 #include <QNetworkAccessManager>
@@ -9,6 +8,9 @@
 #include <QFile>
 
 #define XML_URL "https://github.com/Instein98/PlayableLab/releases/download/Updater/Release.xml"
+#define MSG_CHECK_UPDATE "Checking for updates..."
+#define MSG_UPDATE "Updating..."
+#define MSG_LAUNCH "Launching the game..."
 #define OLD_XML_NAME "Release.xml"
 #define NEW_XML_NAME "Release-new.xml"
 #define SUCCESS 1
@@ -22,6 +24,7 @@ enum programStage{
 };
 
 
+// the Worker do the background work, communicate with GUI by signal
 class Worker : public QObject {
 
     Q_OBJECT

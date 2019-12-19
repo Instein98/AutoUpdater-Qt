@@ -5,6 +5,8 @@
 #include <QTextCodec>
 #include <private/qzipreader_p.h>
 
+
+// the version info is stored in xml
 struct Worker::VersionInfo{
     QString versionTag;
     QString url;
@@ -27,7 +29,7 @@ Worker::~Worker(){
 void Worker::doWork(){  // start the work
     currentStage = DownloadXML;
     QUrl xmlUrl = QUrl::fromUserInput(XML_URL);
-    download(&xmlUrl, false, NEW_XML_NAME, "Checking for updates...");
+    download(&xmlUrl, false, NEW_XML_NAME, MSG_CHECK_UPDATE);
 }
 
 void Worker::updateProgress(qint64 dowloadedBytes, qint64 totalBytes){
@@ -65,7 +67,7 @@ void Worker::onFinishDownload(){
                       QFile::remove(OLD_XML_NAME);
                   }
                   QFile::rename(NEW_XML_NAME, OLD_XML_NAME);  // replace the old xml with the new one
-                  emit sigShowStatus("Update complete; Launching the game...");
+                  emit sigShowStatus(MSG_LAUNCH);
                   emit sigLaunchGame();
                   break;
               default:
@@ -132,13 +134,13 @@ void Worker::checkUpdate(){
             if (dir.exists() || zipInfo.exists()){
                 connect(this, SIGNAL(sigLaunchGame()), this, SLOT(launchGame()));
                 emit sigShowProgress(1, 1);
-                emit sigShowStatus("Game is already up to date; Launching game...");
+                emit sigShowStatus(MSG_LAUNCH);
                 emit sigLaunchGame();
             }else{
                 // Download new game files
                 emit sigShowInfo(newVersionInfo->updateInfo);
                 QUrl url = QUrl::fromUserInput(newVersionInfo->url);
-                download(&url, true, url.fileName(), "Updating...");
+                download(&url, true, url.fileName(), MSG_UPDATE);
             }
         }else{
             // Delete old game files first
@@ -153,12 +155,12 @@ void Worker::checkUpdate(){
             // Download new game files
             emit sigShowInfo(newVersionInfo->updateInfo);
             QUrl url = QUrl::fromUserInput(newVersionInfo->url);
-            download(&url, true, url.fileName(), "Updating...");
+            download(&url, true, url.fileName(), MSG_UPDATE);
         }
     }else{
         emit sigShowInfo(newVersionInfo->updateInfo);
         QUrl url = QUrl::fromUserInput(newVersionInfo->url);
-        download(&url, true, url.fileName(), "Updating...");
+        download(&url, true, url.fileName(), MSG_UPDATE);
     }
 }
 
@@ -284,10 +286,3 @@ bool Worker::deleteFileOrDirectory(QString path){
     return true;
 }
 
-bool Worker::checkNetworkOnline(){
-    QNetworkAccessManager am;
-    if (am.networkAccessible() != QNetworkAccessManager::NotAccessible)
-        return true;
-    else
-        return false;
-}

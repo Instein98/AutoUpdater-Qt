@@ -51,17 +51,22 @@
        <property name="minimumSize">
         <size>
          <width>0</width>
-         <height>25</height>
+         <height>35</height>
         </size>
        </property>
        <property name="font">
         <font>
-         <family>微软雅黑</family>
-         <pointsize>14</pointsize>
+         <family>Yu Gothic UI Semibold</family>
+         <pointsize>16</pointsize>
+         <weight>75</weight>
+         <bold>true</bold>
         </font>
        </property>
+       <property name="layoutDirection">
+        <enum>Qt::RightToLeft</enum>
+       </property>
        <property name="text">
-        <string>正在检测更新……</string>
+        <string>checking update……</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>
